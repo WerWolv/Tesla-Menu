@@ -59,13 +59,13 @@ CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=c++17
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:= -lnx -llibtesla -lnx
+LIBS	:= -lnx -ltesla -lnx
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
-LIBDIRS	:= $(PORTLIBS) $(LIBNX) $(TOPDIR)/libtesla
+LIBDIRS	:= $(PORTLIBS) $(LIBNX) $(TOPDIR)/libs/libtesla
 
 
 #---------------------------------------------------------------------------------
@@ -183,25 +183,12 @@ DEPENDS	:=	$(OFILES:.o=.d)
 #---------------------------------------------------------------------------------
 # main targets
 #---------------------------------------------------------------------------------
-ifeq ($(strip $(APP_JSON)),)
+all	:	ovlmenu.ovl
 
-all	:	$(OUTPUT).nro
+ovlmenu.ovl		:	$(OUTPUT).nro
+	@cp $(OUTPUT).nro $(TOPDIR)/ovlmenu.ovl
 
-ifeq ($(strip $(NO_NACP)),)
 $(OUTPUT).nro	:	$(OUTPUT).elf $(OUTPUT).nacp
-else
-$(OUTPUT).nro	:	$(OUTPUT).elf
-endif
-
-else
-
-all	:	$(OUTPUT).nsp
-
-$(OUTPUT).nsp	:	$(OUTPUT).nso $(OUTPUT).npdm
-
-$(OUTPUT).nso	:	$(OUTPUT).elf
-
-endif
 
 $(OUTPUT).elf	:	$(OFILES)
 
