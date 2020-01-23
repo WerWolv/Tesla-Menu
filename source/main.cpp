@@ -65,58 +65,64 @@ std::pair<Result, std::string> getOverlayName(std::string filePath) {
     return { ResultSuccess, std::string(nacp.lang[0].name, sizeof(nacp.lang[0].name)) };
 }
 
+static tsl::element::Frame *rootFrame = nullptr;
+
+static void rebuildUI() {
+    auto *overlayList = new tsl::element::List();  
+    auto header = new tsl::element::CustomDrawer(0, 0, 100, FB_WIDTH, [](u16 x, u16 y, tsl::Screen *screen){
+        screen->drawRGBA8Image(20, 20, 84, 31, logo_bin);
+        screen->drawString(envGetLoaderInfo(), false, 20, 68, 15, tsl::a(0xFFFF));
+    });
+
+    auto noOverlaysError = new tsl::element::CustomDrawer(0, 0, 100, FB_WIDTH, [](u16 x, u16 y, tsl::Screen *screen) {
+        screen->drawString("\uE150", false, (FB_WIDTH - 90) / 2, 300, 90, tsl::a(0xFFFF));
+        screen->drawString("No Overlays found!", false, 105, 380, 25, tsl::a(0xFFFF));
+    });
+
+    u16 entries = 0;
+    for (const auto &entry : std::filesystem::directory_iterator("sdmc:/switch/.overlays")) {
+        if (entry.path().filename() == "ovlmenu.ovl")
+            continue;
+
+        auto [result, name] = getOverlayName(entry.path());
+        if (result != ResultSuccess)
+            continue;
+
+        auto *listEntry = new tsl::element::ListItem(name);
+        listEntry->setClickListener([entry, entries](s64 key) {
+            if (key & KEY_A) {
+                tsl::Overlay::setNextLoadPath(entry.path().c_str());
+                
+                tsl::Gui::closeGui();
+                return true;
+            }
+
+            return false;
+        });
+
+        overlayList->addItem(listEntry);
+        entries++;
+    }
+
+    rootFrame->addElement(header);
+
+    if (entries == 0) {
+        rootFrame->addElement(noOverlaysError);
+        delete overlayList;
+    } else {
+        rootFrame->addElement(overlayList);
+    }
+}
+
 class GuiMain : public tsl::Gui {
 public:
     GuiMain() { }
     ~GuiMain() { }
 
     virtual tsl::Element* createUI() {
-        auto *rootFrame = new tsl::element::Frame();
-        auto *overlayList = new tsl::element::List();
+        rootFrame = new tsl::element::Frame();
         
-        auto header = new tsl::element::CustomDrawer(0, 0, 100, FB_WIDTH, [](u16 x, u16 y, tsl::Screen *screen){
-            screen->drawRGBA8Image(20, 20, 84, 31, logo_bin);
-            screen->drawString(envGetLoaderInfo(), false, 20, 68, 15, tsl::a(0xFFFF));
-        });
-
-        auto noOverlaysError = new tsl::element::CustomDrawer(0, 0, 100, FB_WIDTH, [](u16 x, u16 y, tsl::Screen *screen) {
-            screen->drawString("\uE150", false, (FB_WIDTH - 90) / 2, 300, 90, tsl::a(0xFFFF));
-            screen->drawString("No Overlays found!", false, 105, 380, 25, tsl::a(0xFFFF));
-        });
-
-        u16 entries = 0;
-        for (const auto &entry : std::filesystem::directory_iterator("sdmc:/switch/.overlays")) {
-            if (entry.path().filename() == "ovlmenu.ovl")
-                continue;
-
-            auto [result, name] = getOverlayName(entry.path());
-            if (result != ResultSuccess)
-                continue;
-
-            auto *listEntry = new tsl::element::ListItem(name);
-            listEntry->setClickListener([entry, entries](s64 key) {
-                if (key & KEY_A) {
-                    tsl::Overlay::setNextLoadPath(entry.path().c_str());
-                    
-                    tsl::Gui::closeGui();
-                    return true;
-                }
-
-                return false;
-            });
-
-            overlayList->addItem(listEntry);
-            entries++;
-        }
-
-        rootFrame->addElement(header);
-
-        if (entries == 0) {
-            rootFrame->addElement(noOverlaysError);
-            delete overlayList;
-        } else {
-            rootFrame->addElement(overlayList);
-        }
+        rebuildUI();
 
         return rootFrame;
     }
@@ -130,7 +136,16 @@ public:
     ~TeslaOverlay() { }
 
     tsl::Gui* onSetup() { return new GuiMain(); }
-    void onOverlayShow(tsl::Gui *gui) override { tsl::Gui::playIntroAnimation(); }
+    void onOverlayShow(tsl::Gui *gui) override { 
+        if (rootFrame != nullptr) {
+            rootFrame->clear();
+            rebuildUI();
+            rootFrame->layout();
+        }
+        
+        tsl::Gui::playIntroAnimation();
+    }
+
     void onOverlayHide(tsl::Gui *gui) override { tsl::Gui::playOutroAnimation(); }
     void onOverlayExit(tsl::Gui *gui) override { tsl::Gui::playOutroAnimation(); }
 };
