@@ -84,6 +84,9 @@ static void rebuildUI() {
         if (entry.path().filename() == "ovlmenu.ovl")
             continue;
 
+        if (entry.path().extension() != ".ovl")
+            continue;
+
         auto [result, name] = getOverlayName(entry.path());
         if (result != ResultSuccess)
             continue;
