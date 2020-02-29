@@ -17,12 +17,14 @@
  * along with Tesla Menu.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define TESLA_INIT_IMPL
+#include <tesla.hpp>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <switch.h>
-#include <tesla.hpp>
 #include <filesystem>
 
 #include <switch/nro.h>
@@ -65,18 +67,27 @@ std::pair<Result, std::string> getOverlayName(std::string filePath) {
     return { ResultSuccess, std::string(nacp.lang[0].name, sizeof(nacp.lang[0].name)) };
 }
 
-static tsl::element::Frame *rootFrame = nullptr;
+class TeslaMenuFrame : public tsl::elm::OverlayFrame {
+public:
+    TeslaMenuFrame() : OverlayFrame("", "") {}
+    ~TeslaMenuFrame() {}
+
+    virtual void draw(tsl::gfx::Renderer *renderer) override {
+        OverlayFrame::draw(renderer);
+
+        renderer->drawBitmap(20, 20, 84, 31, logo_bin);
+        renderer->drawString(envGetLoaderInfo(), false, 20, 68, 15, renderer->a(0xFFFF));
+    }
+};
+
+static TeslaMenuFrame *rootFrame = nullptr;
 
 static void rebuildUI() {
-    auto *overlayList = new tsl::element::List();  
-    auto header = new tsl::element::CustomDrawer(0, 0, 100, FB_WIDTH, [](u16 x, u16 y, tsl::Screen *screen){
-        screen->drawRGBA8Image(20, 20, 84, 31, logo_bin);
-        screen->drawString(envGetLoaderInfo(), false, 20, 68, 15, tsl::a(0xFFFF));
-    });
+    auto *overlayList = new tsl::elm::List();  
 
-    auto noOverlaysError = new tsl::element::CustomDrawer(0, 0, 100, FB_WIDTH, [](u16 x, u16 y, tsl::Screen *screen) {
-        screen->drawString("\uE150", false, (FB_WIDTH - 90) / 2, 300, 90, tsl::a(0xFFFF));
-        screen->drawString("No Overlays found!", false, 105, 380, 25, tsl::a(0xFFFF));
+    auto noOverlaysError = new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *renderer, u16 x, u16 y, u16 w, u16 h) {
+        renderer->drawString("\uE150", false, (tsl::cfg::FramebufferWidth - 90) / 2, 300, 90, renderer->a(0xFFFF));
+        renderer->drawString("No Overlays found!", false, 105, 380, 25, renderer->a(0xFFFF));
     });
 
     u16 entries = 0;
@@ -91,12 +102,12 @@ static void rebuildUI() {
         if (result != ResultSuccess)
             continue;
 
-        auto *listEntry = new tsl::element::ListItem(name);
+        auto *listEntry = new tsl::elm::ListItem(name);
         listEntry->setClickListener([entry, entries](s64 key) {
             if (key & KEY_A) {
-                tsl::Overlay::setNextLoadPath(entry.path().c_str());
+                tsl::setNextOverlay(entry.path());
                 
-                tsl::Gui::closeGui();
+                tsl::Overlay::get()->close();
                 return true;
             }
 
@@ -107,13 +118,11 @@ static void rebuildUI() {
         entries++;
     }
 
-    rootFrame->addElement(header);
-
     if (entries == 0) {
-        rootFrame->addElement(noOverlaysError);
+        rootFrame->setContent(noOverlaysError);
         delete overlayList;
     } else {
-        rootFrame->addElement(overlayList);
+        rootFrame->setContent(overlayList);
     }
 }
 
@@ -122,38 +131,35 @@ public:
     GuiMain() { }
     ~GuiMain() { }
 
-    virtual tsl::Element* createUI() {
-        rootFrame = new tsl::element::Frame();
+    tsl::elm::Element* createUI() override {
+        rootFrame = new TeslaMenuFrame();
         
         rebuildUI();
 
         return rootFrame;
     }
-
-    virtual void update() { }
 };
 
-class TeslaOverlay : public tsl::Overlay {
+class OverlayTeslaMenu : public tsl::Overlay {
 public:
-    TeslaOverlay() { }
-    ~TeslaOverlay() { }
+    OverlayTeslaMenu() { }
+    ~OverlayTeslaMenu() { }
 
-    tsl::Gui* onSetup() { return new GuiMain(); }
-    void onOverlayShow(tsl::Gui *gui) override { 
+    void onShow() override { 
         if (rootFrame != nullptr) {
-            rootFrame->clear();
+            tsl::Overlay::get()->getCurrentGui()->removeFocus();
             rebuildUI();
-            rootFrame->layout();
+            rootFrame->invalidate();
+            tsl::Overlay::get()->getCurrentGui()->requestFocus(rootFrame, tsl::FocusDirection::None);
         }
-        
-        tsl::Gui::playIntroAnimation();
     }
 
-    void onOverlayHide(tsl::Gui *gui) override { tsl::Gui::playOutroAnimation(); }
-    void onOverlayExit(tsl::Gui *gui) override { tsl::Gui::playOutroAnimation(); }
+    std::unique_ptr<tsl::Gui> loadInitialGui() override {
+        return initially<GuiMain>();
+    }
 };
 
 
-tsl::Overlay *overlayLoad() {
-    return new TeslaOverlay();
+int main(int argc, char **argv) {
+    return tsl::loop<OverlayTeslaMenu, tsl::impl::LaunchFlags::None>(argc, argv);
 }
