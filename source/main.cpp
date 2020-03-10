@@ -30,6 +30,8 @@
 #include <switch/nro.h>
 #include <switch/nacp.h>
 
+#include <options.hpp>
+
 #include "logo_bin.h"
 
 constexpr int Module_OverlayLoader  = 348;
@@ -73,14 +75,21 @@ public:
     ~TeslaMenuFrame() {}
 
     virtual void draw(tsl::gfx::Renderer *renderer) override {
-        OverlayFrame::draw(renderer);
+        renderer->fillScreen(a({ 0x0, 0x0, 0x0, 0xD }));
 
         renderer->drawBitmap(20, 20, 84, 31, logo_bin);
         renderer->drawString(envGetLoaderInfo(), false, 20, 68, 15, renderer->a(0xFFFF));
+
+        renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
+        renderer->drawString("\uE0EF  Options     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
+
+        if (this->m_contentElement != nullptr)
+            this->m_contentElement->frame(renderer);
     }
 };
 
 static TeslaMenuFrame *rootFrame = nullptr;
+static tsl::Gui *guiMain = nullptr;
 
 static void rebuildUI() {
     auto *overlayList = new tsl::elm::List();  
@@ -132,11 +141,21 @@ public:
     ~GuiMain() { }
 
     tsl::elm::Element* createUI() override {
+        guiMain = this;
+
         rootFrame = new TeslaMenuFrame();
         
         rebuildUI();
 
         return rootFrame;
+    }
+
+    bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) {
+        if (keysDown & KEY_PLUS) {
+            tsl::changeTo<OptionsMenu>();
+            return true;
+        }
+        return false;
     }
 };
 
@@ -146,7 +165,7 @@ public:
     ~OverlayTeslaMenu() { }
 
     void onShow() override { 
-        if (rootFrame != nullptr) {
+        if (rootFrame != nullptr && tsl::Overlay::get()->getCurrentGui().get() == guiMain) {
             tsl::Overlay::get()->getCurrentGui()->removeFocus();
             rebuildUI();
             rootFrame->invalidate();
