@@ -145,6 +145,14 @@ public:
     OverlayTeslaMenu() { }
     ~OverlayTeslaMenu() { }
 
+    void initServices() override {
+        ASSERT_FATAL(fsdevMountSdmc());
+    }
+
+    void exitServices() override {
+        fsdevUnmountAll();
+    }
+
     void onShow() override { 
         if (rootFrame != nullptr) {
             tsl::Overlay::get()->getCurrentGui()->removeFocus();
