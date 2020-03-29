@@ -26,6 +26,7 @@
 
 #include <switch.h>
 #include <filesystem>
+#include <tuple>
 
 #include <switch/nro.h>
 #include <switch/nacp.h>
@@ -37,7 +38,7 @@ constexpr int Module_OverlayLoader  = 348;
 constexpr Result ResultSuccess      = MAKERESULT(0, 0);
 constexpr Result ResultParseError   = MAKERESULT(Module_OverlayLoader, 1);
 
-std::pair<Result, std::string> getOverlayName(std::string filePath) {
+std::tuple<Result, std::string, std::string> getOverlayInfo(std::string filePath) {
     FILE *file = fopen(filePath.c_str(), "r");
 
     NroHeader header;
@@ -47,50 +48,52 @@ std::pair<Result, std::string> getOverlayName(std::string filePath) {
     fseek(file, sizeof(NroStart), SEEK_SET);
     if (fread(&header, sizeof(NroHeader), 1, file) != 1) {
         fclose(file);
-        return { ResultParseError, "" };
+        return { ResultParseError, "", "" };
     }
 
     fseek(file, header.size, SEEK_SET);
     if (fread(&assetHeader, sizeof(NroAssetHeader), 1, file) != 1) {
         fclose(file);
-        return { ResultParseError, "" };
+        return { ResultParseError, "", "" };
     }
 
     fseek(file, header.size + assetHeader.nacp.offset, SEEK_SET);
     if (fread(&nacp, sizeof(NacpStruct), 1, file) != 1) {
         fclose(file);
-        return { ResultParseError, "" };
+        return { ResultParseError, "", "" };
     }
     
     fclose(file);
 
-    return { ResultSuccess, std::string(nacp.lang[0].name, sizeof(nacp.lang[0].name)) };
+    return { ResultSuccess, std::string(nacp.lang[0].name, std::strlen(nacp.lang[0].name)), std::string(nacp.display_version, std::strlen(nacp.display_version)) };
 }
 
-class TeslaMenuFrame : public tsl::elm::OverlayFrame {
-public:
-    TeslaMenuFrame() : OverlayFrame("", "") {}
-    ~TeslaMenuFrame() {}
-
-    virtual void draw(tsl::gfx::Renderer *renderer) override {
-        OverlayFrame::draw(renderer);
-
-        renderer->drawBitmap(20, 20, 84, 31, logo_bin);
-        renderer->drawString(envGetLoaderInfo(), false, 20, 68, 15, renderer->a(0xFFFF));
-    }
-};
-
-static TeslaMenuFrame *rootFrame = nullptr;
+static tsl::elm::HeaderOverlayFrame *rootFrame = nullptr;
 
 static void rebuildUI() {
     auto *overlayList = new tsl::elm::List();  
+    auto *header = new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *renderer, s32 x, s32 y, s32 w, s32 h) {
+        const u8 *logo = logo_bin;
+
+        for (s32 y1 = 0; y1 < 31; y1++) {
+            for (s32 x1 = 0; x1 < 84; x1++) {
+                const tsl::gfx::Color color = { static_cast<u8>(logo[3] >> 4), static_cast<u8>(logo[2] >> 4), static_cast<u8>(logo[1] >> 4), static_cast<u8>(logo[0] >> 4) };
+                renderer->setPixelBlendSrc(20 + x1, 20 + y1, renderer->a(color));
+                logo += 4;
+            }
+        }
+
+        renderer->drawString(envGetLoaderInfo(), false, 20, 68, 15, renderer->a(0xFFFF));
+    });
 
     auto noOverlaysError = new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *renderer, u16 x, u16 y, u16 w, u16 h) {
-        renderer->drawString("\uE150", false, (tsl::cfg::FramebufferWidth - 90) / 2, 300, 90, renderer->a(0xFFFF));
-        renderer->drawString("No Overlays found!", false, 105, 380, 25, renderer->a(0xFFFF));
+        renderer->drawString("\uE150", false, (tsl::cfg::FramebufferWidth - 90) / 2, 300, 90, renderer->a(tsl::style::color::ColorText));
+        renderer->drawString("No Overlays found!", false, 105, 380, 25, renderer->a(tsl::style::color::ColorText));
+        renderer->drawString("Place your .ovl files in /switch/.overlays", false, 82, 410, 15, renderer->a(tsl::style::color::ColorDescription));
     });
 
     u16 entries = 0;
+    fsdevMountSdmc();
     for (const auto &entry : std::filesystem::directory_iterator("sdmc:/switch/.overlays")) {
         if (entry.path().filename() == "ovlmenu.ovl")
             continue;
@@ -98,11 +101,12 @@ static void rebuildUI() {
         if (entry.path().extension() != ".ovl")
             continue;
 
-        auto [result, name] = getOverlayName(entry.path());
+        auto [result, name, version] = getOverlayInfo(entry.path());
         if (result != ResultSuccess)
             continue;
 
         auto *listEntry = new tsl::elm::ListItem(name);
+        listEntry->setValue(version, true);
         listEntry->setClickListener([entry, entries](s64 key) {
             if (key & KEY_A) {
                 tsl::setNextOverlay(entry.path());
@@ -118,12 +122,16 @@ static void rebuildUI() {
         entries++;
     }
 
+    rootFrame->setHeader(header);
+
     if (entries == 0) {
         rootFrame->setContent(noOverlaysError);
         delete overlayList;
     } else {
         rootFrame->setContent(overlayList);
     }
+
+    fsdevUnmountDevice("sdmc");
 }
 
 class GuiMain : public tsl::Gui {
@@ -132,7 +140,7 @@ public:
     ~GuiMain() { }
 
     tsl::elm::Element* createUI() override {
-        rootFrame = new TeslaMenuFrame();
+        rootFrame = new tsl::elm::HeaderOverlayFrame();
         
         rebuildUI();
 

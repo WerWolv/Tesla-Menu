@@ -4,7 +4,7 @@
             "name": "DKP Aarch64 Windows",
             "includePath": [
                 "C:/devkitPro/devkitA64/aarch64-none-elf/include/**",
-                "C:/devkitPro/devkitA64/lib/gcc/aarch64-none-elf/8.3.0/include/**",
+                "C:/devkitPro/devkitA64/lib/gcc/aarch64-none-elf/9.2.0/include/**",
                 "C:/devkitPro/libnx/include/**",
                 "C:/devkitPro/portlibs/switch/include/**",
                 "C:/devkitPro/portlibs/switch/include/freetype2/**",
@@ -25,7 +25,7 @@
             "name": "DKP Aarch64 Linux",
             "includePath": [
                 "/opt/devkitpro/devkitA64/aarch64-none-elf/include/**",
-                "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/8.3.0/include/**",
+                "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/9.2.0/include/**",
                 "/opt/devkitpro/libnx/include/**",
                 "/opt/devkitpro/portlibs/switch/include/**",
                 "/opt/devkitpro/portlibs/switch/include/**",
