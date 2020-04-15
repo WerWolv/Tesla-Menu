@@ -40,7 +40,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 APP_TITLE	:=	Tesla Menu
 APP_VERSION	:=	v1.1.1
 
-TARGET		:=	$(notdir $(CURDIR))
+TARGET		:=	ovlmenu
 BUILD		:=	build
 SOURCES		:=	source
 DATA		:=	data
@@ -171,7 +171,7 @@ $(BUILD):
 clean:
 	@echo clean ...
 ifeq ($(strip $(APP_JSON)),)
-	@rm -fr $(BUILD) $(TARGET).nro $(TARGET).nacp $(TARGET).elf
+	@rm -fr $(BUILD) $(TARGET).ovl $(TARGET).nacp $(TARGET).elf
 else
 	@rm -fr $(BUILD) $(TARGET).nsp $(TARGET).nso $(TARGET).npdm $(TARGET).elf
 endif
@@ -186,12 +186,11 @@ DEPENDS	:=	$(OFILES:.o=.d)
 #---------------------------------------------------------------------------------
 # main targets
 #---------------------------------------------------------------------------------
-all	:	ovlmenu.ovl
+all	:	$(OUTPUT).ovl
 
-ovlmenu.ovl		:	$(OUTPUT).nro
-	@cp $(OUTPUT).nro $(TOPDIR)/ovlmenu.ovl
-
-$(OUTPUT).nro	:	$(OUTPUT).elf $(OUTPUT).nacp
+$(OUTPUT).ovl		:	$(OUTPUT).elf $(OUTPUT).nacp 
+	@elf2nro $< $@ $(NROFLAGS)
+	@echo "built ... $(notdir $(OUTPUT).ovl)"
 
 $(OUTPUT).elf	:	$(OFILES)
 
