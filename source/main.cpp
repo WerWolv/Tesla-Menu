@@ -77,7 +77,7 @@ static void rebuildUI() {
 
         for (s32 y1 = 0; y1 < 31; y1++) {
             for (s32 x1 = 0; x1 < 84; x1++) {
-                const tsl::gfx::Color color = { static_cast<u8>(logo[3] >> 4), static_cast<u8>(logo[2] >> 4), static_cast<u8>(logo[1] >> 4), static_cast<u8>(logo[0] >> 4) };
+                const tsl::Color color = { static_cast<u8>(logo[3] >> 4), static_cast<u8>(logo[2] >> 4), static_cast<u8>(logo[1] >> 4), static_cast<u8>(logo[0] >> 4) };
                 renderer->setPixelBlendSrc(20 + x1, 20 + y1, renderer->a(color));
                 logo += 4;
             }
