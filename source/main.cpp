@@ -134,6 +134,88 @@ static void rebuildUI() {
     fsdevUnmountDevice("sdmc");
 }
 
+#include "netload.hpp"
+
+constexpr const SocketInitConfig sockConf = {
+    .bsdsockets_version = 1,
+
+    .tcp_tx_buf_size = 0x800,
+    .tcp_rx_buf_size = 0x800,
+    .tcp_tx_buf_max_size = 0x25000,
+    .tcp_rx_buf_max_size = 0x25000,
+
+    .udp_tx_buf_size = 0,
+    .udp_rx_buf_size = 0,
+
+    .sb_efficiency = 1,
+
+    .num_bsd_sessions = 0,
+    .bsd_service_type = BsdServiceType_Auto,
+};
+
+class GuiNetloader : public tsl::Gui {
+private:
+    Thread thread;
+    std::string err = "Good";
+    Result rc = 0;
+
+public:
+    GuiNetloader() {
+        tsl::hlp::doWithSmSession([this] {
+            if (R_SUCCEEDED(rc = socketInitialize(&sockConf)))
+                if (R_SUCCEEDED(rc = nifmInitialize(NifmServiceType_User)))
+                    rc = fsdevMountSdmc();
+            std::sprintf(err.data(), "0x%x", rc);
+        });
+        threadCreate(&thread, netloader::task, nullptr, nullptr, 0x1000, 0x2C, -2);
+        threadStart(&thread);
+    }
+
+    ~GuiNetloader() {
+        netloader::signalExit();
+
+        threadWaitForExit(&thread);
+        threadClose(&thread);
+
+        fsdevUnmountAll();
+        nifmExit();
+        socketExit();
+    }
+
+    tsl::elm::Element* createUI() override {
+        auto *rootFrame = new tsl::elm::OverlayFrame(envGetLoaderInfo(), "Netloader");
+        
+        rootFrame->setContent(
+            new tsl::elm::CustomDrawer(
+                [this](tsl::gfx::Renderer *renderer, s32 x, s32 y, s32 w, s32 h) {
+                    renderer->drawString(err.c_str(), false, 100, 400, 20, tsl::style::color::ColorText);
+                }
+            )
+        );
+
+        return rootFrame;
+    }
+
+    void update() {
+        static int counter = 0;
+        if ((counter++ % 5) != 0)
+            return;
+
+        netloader::State state = {};
+        netloader::getState(&state);
+
+		if (state.launch_app && !state.activated) {
+			netloader::setNext();
+
+            tsl::Overlay::get()->close();
+
+            err = "Finished!";
+		}
+        if (state.errormsg[0])
+            err = state.errormsg;
+    }
+};
+
 class GuiMain : public tsl::Gui {
 public:
     GuiMain() { }
@@ -145,6 +227,14 @@ public:
         rebuildUI();
 
         return rootFrame;
+    }
+
+    bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) {
+        if (keysDown & KEY_Y) {
+            tsl::changeTo<GuiNetloader>();
+            return true;
+        }
+        return false;
     }
 };
 
