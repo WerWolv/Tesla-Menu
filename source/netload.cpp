@@ -381,7 +381,7 @@ namespace netloader {
 
             sanitisePath(filepath);
 
-            snprintf(path_buffer, sizeof(path_buffer) - 1, "/switch/.overlays/%s", filepath);
+            snprintf(path_buffer, sizeof(path_buffer) - 1, "sdmc:/switch/.overlays/%s", filepath);
             // make sure it's terminated
             path_buffer[sizeof(path_buffer) - 1] = 0;
             strncpy(filepath, path_buffer, sizeof(filepath) - 1); // menuEntryLoad() below will overwrite path_buffer, so copy path_buffer to filepath and use that instead.
@@ -407,7 +407,7 @@ namespace netloader {
                 netloader_error("open", errno);
                 response = -1;
             } else {
-                fseek(file, filelen, SEEK_SET);
+                fseek(file, filelen - 1, SEEK_SET);
                 fwrite("\0", 1, 1, file);
                 fseek(file, 0, SEEK_SET);
             }
@@ -728,6 +728,8 @@ namespace netloader {
 
         uint32_t remote = g_args.nxlink_host.s_addr;
 
+        g_args.add("--skipCombo");
+
         if (remote) {
             char nxlinked[17];
             sprintf(nxlinked, "%08x_NXLINK_", remote);
@@ -735,8 +737,6 @@ namespace netloader {
         }
 
         init_args(argBuf, sizeof(argBuf) - 1, g_args.buf, sizeof(g_args.buf));
-
-        std::strcat(argBuf, " --skipCombo");
 
         return envSetNextLoad(path_buffer, argBuf);
     }

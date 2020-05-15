@@ -93,7 +93,6 @@ static void rebuildUI() {
     });
 
     u16 entries = 0;
-    fsdevMountSdmc();
     for (const auto &entry : std::filesystem::directory_iterator("sdmc:/switch/.overlays")) {
         if (entry.path().filename() == "ovlmenu.ovl")
             continue;
@@ -130,8 +129,6 @@ static void rebuildUI() {
     } else {
         rootFrame->setContent(overlayList);
     }
-
-    fsdevUnmountDevice("sdmc");
 }
 
 #include "netload.hpp"
@@ -163,8 +160,7 @@ public:
     GuiNetloader() {
         tsl::hlp::doWithSmSession([this] {
             if (R_SUCCEEDED(rc = socketInitialize(&sockConf)))
-                if (R_SUCCEEDED(rc = nifmInitialize(NifmServiceType_User)))
-                    rc = fsdevMountSdmc();
+                rc = nifmInitialize(NifmServiceType_User);
             std::sprintf(err.data(), "0x%x", rc);
         });
         threadCreate(&thread, netloader::task, nullptr, nullptr, 0x1000, 0x2C, -2);
@@ -177,7 +173,6 @@ public:
         threadWaitForExit(&thread);
         threadClose(&thread);
 
-        fsdevUnmountAll();
         nifmExit();
         socketExit();
     }
@@ -204,13 +199,13 @@ public:
         netloader::State state = {};
         netloader::getState(&state);
 
-		if (state.launch_app && !state.activated) {
-			netloader::setNext();
+        if (state.launch_app && !state.activated) {
+            netloader::setNext();
 
             tsl::Overlay::get()->close();
 
             err = "Finished!";
-		}
+        }
         if (state.errormsg[0])
             err = state.errormsg;
     }
@@ -242,6 +237,12 @@ class OverlayTeslaMenu : public tsl::Overlay {
 public:
     OverlayTeslaMenu() { }
     ~OverlayTeslaMenu() { }
+    void initServices() {
+        fsdevMountSdmc();
+    }
+    void exitServices() {
+        fsdevUnmountAll();
+    }
 
     void onShow() override { 
         if (rootFrame != nullptr) {
