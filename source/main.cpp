@@ -108,7 +108,7 @@ static void rebuildUI() {
         auto *listEntry = new tsl::elm::ListItem(name);
         listEntry->setValue(version, true);
         listEntry->setClickListener([entry, entries](s64 key) {
-            if (key & KEY_A) {
+            if (key & HidNpadButton_A) {
                 tsl::setNextOverlay(entry.path());
                 
                 tsl::Overlay::get()->close();
