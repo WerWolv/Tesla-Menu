@@ -92,7 +92,8 @@ static void rebuildUI() {
         renderer->drawString("Place your .ovl files in /switch/.overlays", false, 82, 410, 15, renderer->a(tsl::style::color::ColorDescription));
     });
 
-    u16 entries = 0;
+    std::vector<std::filesystem::directory_entry> overlayFiles;
+
     fsdevMountSdmc();
     for (const auto &entry : std::filesystem::directory_iterator("sdmc:/switch/.overlays")) {
         if (entry.path().filename() == "ovlmenu.ovl")
@@ -101,13 +102,21 @@ static void rebuildUI() {
         if (entry.path().extension() != ".ovl")
             continue;
 
+        overlayFiles.push_back(entry);
+    }
+
+    std::sort(overlayFiles.begin(), overlayFiles.end(), [](const auto &left, const auto &right) {
+        return left.path().filename() < right.path().filename();
+    });
+
+    for (const auto &entry : overlayFiles) {
         auto [result, name, version] = getOverlayInfo(entry.path());
         if (result != ResultSuccess)
             continue;
 
         auto *listEntry = new tsl::elm::ListItem(name);
         listEntry->setValue(version, true);
-        listEntry->setClickListener([entry, entries](s64 key) {
+        listEntry->setClickListener([entry](s64 key) {
             if (key & HidNpadButton_A) {
                 tsl::setNextOverlay(entry.path());
                 
@@ -119,12 +128,11 @@ static void rebuildUI() {
         });
 
         overlayList->addItem(listEntry);
-        entries++;
     }
 
     rootFrame->setHeader(header);
 
-    if (entries == 0) {
+    if (overlayFiles.empty()) {
         rootFrame->setContent(noOverlaysError);
         delete overlayList;
     } else {
