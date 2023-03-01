@@ -1,0 +1,26 @@
+---
+name: ci
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64
+
+    steps:
+    - name: Checkout project
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Build project
+      run: make
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        path: ovlmenu.ovl
